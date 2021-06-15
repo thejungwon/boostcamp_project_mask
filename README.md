@@ -20,7 +20,7 @@ python main.py
 
 
 ### Trouble Shooting
-- 바로 Ai Stages서버에 접근을 하시면 서버에 SSL인증서가 없어 https의 형태로 접근을 못하게되는 경우 크롬에서 카메라 접근을 차단하게됩니다 
+- 바로 Ai Stages서버에 접근을 하시면 서버에 SSL인증서가 없어 https의 형태로 접근을 못하게되는데, 이 경우 크롬에서 카메라 접근을 차단하게됩니다 
   - 본인의 환경에서 시연하는 경우에는 크롬에서 `chrome://flags/#unsafely-treat-insecure-origin-as-secure` 에 현재 서버 주소를 입력하는 식으로 우회할 수 있습니다.
 - 퍼블릭하게 오픈하려는 경우 SSL인증서를 제공하는 환경에서 서버를 구축하셔야합니다.
   - 이때 서버와 클라이언트를 분리해서, 클라이언트는 SSL인증서가 있는 곳에 호스팅을 하시고, 서버는 Ai Stages에서 돌리신다음 `fetch` 함수 부분에 주소를 바꿔주세요!
