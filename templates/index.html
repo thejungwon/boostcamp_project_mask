@@ -1,0 +1,225 @@
+
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-+0n0xVW2eSR5OomGNYDnhzAbDsOXxcvSN1TPprVMTNDbiYZCxYbOOl7+AMvyTG2x" crossorigin="anonymous">
+
+        <style>
+            *{
+                color:#4db8ff;
+            }
+            html, body, .container, .row{
+                height:100%;
+            }
+            body{
+                background-color: #000;
+            }
+            .header{
+                position:absolute;
+                width:100%;
+                font-size: 50px;
+                color: #4db8ff;
+                text-align: center;
+            }
+            .header h2{
+                margin-top:5px;
+                margin-bottom:0px;
+                
+            }
+            .header p{
+                margin:0;
+                font-size:20px;
+            }
+            .row .col{
+                border: 1px solid #4db8ff;
+            }
+            .row .col h3{
+                text-align: center;
+                color:#4db8ff;
+            }
+            .row .col img{
+                width:30%;
+            }
+        </style>
+    </head>
+    <body>
+        
+        <div class="header">
+            <h2>MAVIS</h2>
+            <p>I detect mask villans</p>
+        </div>
+        <div class="container" style="padding-top: 100px;">
+            <div class="row ">
+                <div class="col" id="law-abiding-citizen">
+                <h3>모범시민</h3>
+                </div>
+                <div class="col">
+                    <video id="video" width="640" height="480" autoplay style="display:none"></video>
+                    <canvas id="canvas" width="640" height="480"></canvas>
+                    <div>
+                        메시지: 
+                        <span id="face-detection-message" > </span>
+                    </div>
+                    <hr/>
+                    <ul id="message-list" style="overflow-y: scroll;height: 100px;"></ul>
+                </div>
+                <div class="col" id="villans">
+                <h3>마스크빌런</h3>
+                </div>
+            </div>
+        </div>
+        
+        
+
+        <script>
+        //시간 관련된 코드
+        Date.prototype.yyyymmdd = function() {
+        var mm = this.getMonth() + 1; // getMonth() is zero-based
+        var dd = this.getDate();
+
+        return [this.getFullYear(),
+                (mm>9 ? '' : '0') + mm,
+                (dd>9 ? '' : '0') + dd
+                ].join('-');
+        };
+        Date.prototype.hhmmss = function() {
+        var hh = this.getHours();
+        var mm = this.getMinutes();
+        var ss = this.getSeconds();
+
+        return [(hh>9 ? '' : '0') + hh,
+                (mm>9 ? '' : '0') + mm,
+                (ss>9 ? '' : '0') + ss,
+                ].join(':');
+        };
+
+
+
+        var video = document.getElementById('video');
+        var canvas = document.getElementById('canvas');
+        var context = canvas.getContext('2d');
+        var started = false;
+
+        
+        var x=0,y=0,w=0,h=0;
+        //카메라 인식 및 사용
+        if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        
+            navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
+                video.srcObject = stream;
+                video.play();
+            });
+        }
+        var face_detect_count = 0;
+
+        //매 100ms마다 현재 Canvas에 인식된 얼굴 영역을 출력
+        setInterval(function(){
+            if(!video.paused){
+                context.drawImage(video, 0, 0, 640, 480);
+                var dataURL = canvas.toDataURL();
+                    context.beginPath();
+                    context.rect(parseInt(x), parseInt(y), parseInt(w), parseInt(h));
+                    
+                    context.lineWidth = 7;
+                    context.strokeStyle = '#4db8ff';
+                    context.stroke();
+            }
+        },100)
+        //매 500ms 마다 얼굴 영역 인식
+        setInterval(function(){
+            if(!video.paused){
+                //보내는 순간 박스를 없애기 위해 다시 영상을 로드함
+                context.drawImage(video, 0, 0, 640, 480);
+                var dataURL = canvas.toDataURL();
+                faceDetect(dataURL)
+            }
+        },500)
+
+        //서버로 얼굴인식을 위해 현재 화면을 보내는 함수
+        function faceDetect(dataURL){
+            fetch('/face_detect', {
+                method: 'POST', // or 'PUT'
+                body: JSON.stringify({"image":dataURL}), // data can be `string` or {object}!
+                headers:{
+                    'Content-Type': 'application/json'
+                }
+            }).then(res => res.json())
+            .then(response => {
+                
+                var data = response;
+                
+                if(data.result == "success"){
+                    started = true;
+                    x=data.x;
+                    y=data.y;
+                    w=data.w;
+                    h=data.h;
+                    face_detect_count+=1;
+                    document.querySelector('#face-detection-message').innerHTML=`얼굴인식 횟수 ${face_detect_count}/10`;
+
+
+                    //얼굴이 10번 이상 인식이 됐으면, 현재 사람이 카메라 앞에 있는 걸로 가정을하고
+                    //마스크 인식을 실행
+                    //이렇게 하지 않을시 사람이 없어도 마스크 인식이 진행되기 때문에 불필요하고 부정확한 결과를 예측
+                    
+                    if (face_detect_count%10==0){
+                        face_detect_count = 0;
+                        //보내는 순간 박스를 없애기 위해 다시 영상을 로드함
+                        context.drawImage(video, 0, 0, 640, 480);
+                        dataURL = canvas.toDataURL();
+                        maskDetect(dataURL);
+                    }
+                }else{
+                    if(started){
+                        context.drawImage(video, 0, 0, 640, 480);
+                        context.beginPath();
+                        context.rect(parseInt(x), parseInt(y), parseInt(w), parseInt(h));
+                        
+                        context.lineWidth = 7;
+                        context.strokeStyle = 'red';
+                        context.stroke();
+                        document.querySelector('#face-detection-message').innerHTML=`얼굴인식 실패`;
+                    }
+                }
+
+            }) 
+            .catch(error => console.error('Error:', error));
+        }
+        
+
+
+        function maskDetect(dataURL){
+            fetch('/mask_detect', {
+            method: 'POST', // or 'PUT'
+            body: JSON.stringify({"image":dataURL}), // data can be `string` or {object}!
+            headers:{
+                'Content-Type': 'application/json'
+            }
+            }).then(res => res.json())
+            .then(response => {
+                
+                var data = response;
+                
+                var li = document.createElement("li");
+                var now = new Date();
+                li.innerText=now.yyyymmdd()+" "+now.hhmmss()+":"+response;
+                document.querySelector('#message-list').prepend(li);
+                var img = document.createElement("img");
+                img.src = dataURL;
+                //모델에서 나온 결과에 따라 마스크를 제대로 쓴 사람과 안쓴 사람을 나눠서 저장
+                if (response[0] =="Not Wear" || response[0]=="Incorrect"){
+                    document.querySelector('#villans').appendChild(img);
+                }else{
+                    document.querySelector('#law-abiding-citizen').appendChild(img);
+                }
+            }) 
+            .catch(error => console.error('Error:', error));
+        }
+
+        
+
+
+        </script>
+    </body>
+</html>
