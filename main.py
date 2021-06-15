@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request
-import numpy as np
 import base64
 import cv2
+import numpy as np
 import json
 from inference import infernece
 
